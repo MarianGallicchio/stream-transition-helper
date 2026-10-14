@@ -118,7 +118,6 @@ export const ReactiveVirtualCam: React.FC<ReactiveVirtualCamProps> = ({
   const [isClicking, setIsClicking] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [keyPressCount, setKeyPressCount] = useState(0);
-  const [apm, setApm] = useState(140);
   const [chromaKeyMode, setChromaKeyMode] = useState(false);
   const [activeEditorTab, setActiveEditorTab] = useState<'reactive' | 'character' | 'presets'>('reactive');
   const [feedbackNotice, setFeedbackNotice] = useState<string | null>(null);
@@ -178,9 +177,9 @@ export const ReactiveVirtualCam: React.FC<ReactiveVirtualCamProps> = ({
 
       checkAudio();
     } catch (err) {
-      console.warn('Microphone access not granted, using simulated speech rhythm:', err);
-      // Fallback: simulated natural speaking when mic is not granted
-      setMicActive(true);
+      console.warn('Micrófono no permitido: el nivel queda en 0 (sin simulación).', err);
+      setMicActive(false);
+      setAudioLevel(0);
     }
   };
 
@@ -221,17 +220,7 @@ export const ReactiveVirtualCam: React.FC<ReactiveVirtualCamProps> = ({
     };
   }, []);
 
-  // 3. Fallback rhythmic speaking simulation if mic not connected
-  useEffect(() => {
-    if (!micActive) {
-      const interval = setInterval(() => {
-        // Natural speech modulation
-        const speechBurst = Math.random() > 0.4 ? 0.3 + Math.random() * 0.6 : 0;
-        setAudioLevel(speechBurst);
-      }, 200);
-      return () => clearInterval(interval);
-    }
-  }, [micActive]);
+  // 3. Sin simulación de voz: si el mic no está activo, el nivel es 0 real.
 
   // 4. Save character to localStorage
   useEffect(() => {
@@ -782,7 +771,7 @@ export const ReactiveVirtualCam: React.FC<ReactiveVirtualCamProps> = ({
                 <div className="grid grid-cols-2 gap-2">
                   {[
                     { id: 'rgb_cat', label: 'Orejas de Gato RGB' },
-                    { id: 'studio_boom', label: 'Headset Pro Shure' },
+                    { id: 'studio_boom', label: 'Headset Pro' },
                     { id: 'cyber_visor', label: 'Visor Cyberpunk' }
                   ].map(hs => (
                     <button

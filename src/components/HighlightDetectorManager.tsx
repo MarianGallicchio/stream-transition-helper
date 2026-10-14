@@ -24,44 +24,8 @@ const DEFAULT_SETTINGS: HighlightDetectorSettings = {
   cooldownSeconds: 15,
 };
 
-// Initial sample highlights to demonstrate functionality immediately
-const INITIAL_HIGHLIGHTS: HighlightSegment[] = [
-  {
-    id: 'hl_sample_1',
-    title: '🔥 ¡CLUTCH 1v4 IMPOSIBLE EN VALORANT! EL CHAT EXPLOTA',
-    streamTimestamp: '00:24:18',
-    uptimeSeconds: 1458,
-    durationSeconds: 30,
-    triggerType: 'combo_hype',
-    triggerDetail: 'Pico de Mic (-1.4 dB) + 34 msgs/min en Chat',
-    intensity: 96,
-    gameCategory: 'Valorant',
-    sceneName: '03. Modo Gaming (Gameplay Screen)',
-    thumbnailUrl: '/src/assets/images/thumbnail_gaming_action_1791998919658.jpg',
-    tags: ['valorant', 'clutch', '1v4', 'radiant', 'kick', 'twitch'],
-    chatSnippet: ['Poggggg', 'NO MANCHESS', 'CLIP THAT BRO', 'QUE TIRO DIOOOS'],
-    status: 'ready',
-    obsReplaySaved: true,
-    notes: 'Eliminó a 4 enemigos en site B con 12 HP restantes.'
-  },
-  {
-    id: 'hl_sample_2',
-    title: '😱 ¡GRITO POR SUSTO EN DIRECTO! REACCIÓN SHOCK',
-    streamTimestamp: '00:41:05',
-    uptimeSeconds: 2465,
-    durationSeconds: 25,
-    triggerType: 'audio_spike',
-    triggerDetail: 'Audio Micrófono Shure SM7B (-0.6 dB)',
-    intensity: 88,
-    gameCategory: 'Valorant',
-    sceneName: '02. Charla Principal (Just Chatting)',
-    thumbnailUrl: '/src/assets/images/thumbnail_irl_reaction_1791998919984.jpg',
-    tags: ['jumpscare', 'reaccion', 'grito', 'streamer'],
-    chatSnippet: ['JAJAJAJAJA', 'RIP OÍDOS', 'F POR MIS AURICULARES', 'clip clip clip'],
-    status: 'ready',
-    obsReplaySaved: true,
-  }
-];
+// Sin highlights de ejemplo: la lista empieza vacía y solo se llena con marcadores reales.
+const INITIAL_HIGHLIGHTS: HighlightSegment[] = [];
 
 export const HighlightDetectorManager: React.FC<HighlightDetectorManagerProps> = ({
   obsState,
@@ -186,7 +150,7 @@ export const HighlightDetectorManager: React.FC<HighlightDetectorManagerProps> =
       replaySaved = obsController.saveReplayBuffer();
     }
 
-    const currentUptime = obsState.stats.uptimeSeconds || 1845;
+    const currentUptime = obsState.stats.uptimeSeconds || 0;
     const formattedTimestamp = formatTime(currentUptime);
 
     const activeScene = obsState.scenes.find(s => s.id === obsState.activeSceneId)?.name || 'Modo Gaming';
@@ -216,8 +180,8 @@ export const HighlightDetectorManager: React.FC<HighlightDetectorManagerProps> =
       gameCategory: gameCategory || 'Gaming',
       sceneName: activeScene,
       thumbnailUrl: activeScene.includes('Charla')
-        ? '/src/assets/images/thumbnail_irl_reaction_1791998919984.jpg'
-        : '/src/assets/images/thumbnail_gaming_action_1791998919658.jpg',
+        ? '/assets/images/thumbnail_irl_reaction_1791998919984.jpg'
+        : '/assets/images/thumbnail_gaming_action_1791998919003.jpg',
       tags: [gameCategory.toLowerCase(), 'highlight', 'clip', 'obs', 'kick', 'twitch'],
       chatSnippet: recentChatSnippets,
       status: 'ready',
@@ -229,20 +193,9 @@ export const HighlightDetectorManager: React.FC<HighlightDetectorManagerProps> =
     onShowToast(`⚡ ¡Momento Épico Detectado y Marcado! [${formattedTimestamp}] ${detail}`);
   };
 
-  // Manual Trigger Button
+  // Manual Trigger Button (único método sin simulación)
   const handleManualMark = () => {
-    checkAndTriggerHighlight('manual_marker', 'Marcador Manual de Streamer (Atajo Instantáneo)', 95);
-  };
-
-  // Simulation: Trigger Audio Spike
-  const handleSimulateAudioSpike = () => {
-    obsController.triggerAudioSpike('audio_mic', -0.5);
-    checkAndTriggerHighlight('audio_spike', 'Simulación: Grito en Micrófono (-0.5 dB)', 98);
-  };
-
-  // Simulation: Trigger Chat Hype Surge
-  const handleSimulateChatSurge = () => {
-    checkAndTriggerHighlight('chat_velocity', 'Simulación: Spam Masivo de Hype (42 msgs/min)', 94);
+    checkAndTriggerHighlight('manual_marker', 'Marcador manual (momento real marcado por el streamer)', 95);
   };
 
   // Request AI Titles & Social Info via Gemini
@@ -491,21 +444,8 @@ OBS Replay Buffer: ${highlight.obsReplaySaved ? 'Guardado en disco' : 'Pendiente
             <span className="font-mono font-bold text-amber-400">{hypeIndex}%</span>
           </div>
 
-          <div className="flex items-center gap-2 mt-2">
-            <button
-              onClick={handleSimulateAudioSpike}
-              className="flex-1 py-1.5 px-2 bg-neutral-900 hover:bg-neutral-800 text-[11px] font-medium text-emerald-300 border border-emerald-900/40 rounded transition-colors text-center"
-              title="Simular un grito o salto de volumen"
-            >
-              💥 Test Audio Spike
-            </button>
-            <button
-              onClick={handleSimulateChatSurge}
-              className="flex-1 py-1.5 px-2 bg-neutral-900 hover:bg-neutral-800 text-[11px] font-medium text-purple-300 border border-purple-900/40 rounded transition-colors text-center"
-              title="Simular una ola de spam y emotes en el chat"
-            >
-              💬 Test Chat Hype
-            </button>
+          <div className="text-[11px] text-neutral-500 mt-2">
+            Sin simulación: habla por tu micrófono real o usa “Marcar Clip Ahora”.
           </div>
         </div>
 
@@ -638,7 +578,7 @@ OBS Replay Buffer: ${highlight.obsReplaySaved ? 'Guardado en disco' : 'Pendiente
         <div className="bg-neutral-950/40 border border-dashed border-neutral-800 rounded-xl p-8 text-center text-neutral-400 space-y-2">
           <Flame className="w-8 h-8 text-neutral-600 mx-auto" />
           <p className="text-xs">No hay momentos detectados en esta categoría aún.</p>
-          <p className="text-[11px] text-neutral-500">Prueba los botones "Test Audio Spike" o "Marcar Clip Ahora" para probar el sistema.</p>
+          <p className="text-[11px] text-neutral-500">Sin momentos aún. Usa "Marcar Clip Ahora" durante un momento real.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

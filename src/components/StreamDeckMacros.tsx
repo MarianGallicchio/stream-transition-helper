@@ -110,26 +110,6 @@ export const StreamDeckMacros: React.FC<StreamDeckMacrosProps> = ({ onTriggerAct
           if (ch.muted) obsController.toggleAudioMute(ch.id);
         });
       }
-    },
-    {
-      id: 'macro_test_drops',
-      name: 'Verificar Alerta de Red',
-      subtitle: 'Comprueba el sistema de alerta en footer y toast',
-      icon: AlertTriangle,
-      color: 'from-amber-600 to-red-600',
-      action: () => {
-        obsController.simulateHighFrameDrops(6.5);
-      }
-    },
-    {
-      id: 'macro_test_restore',
-      name: 'Recalibrar Red Nominal',
-      subtitle: 'Restaura bitrate 6800 kb/s y 0% de pérdidas',
-      icon: Zap,
-      color: 'from-emerald-500 to-emerald-700',
-      action: () => {
-        obsController.restoreNominalNetwork();
-      }
     }
   ];
 

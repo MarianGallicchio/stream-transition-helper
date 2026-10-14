@@ -13,88 +13,42 @@ import { obsController } from './services/obsController';
 import { OBSState, PlatformConfig, UnifiedChatMessage, StreamAlert } from './types/stream';
 
 const INITIAL_KICK_CONFIG: PlatformConfig = {
-  enabled: true,
-  channelName: 'streamer_pro',
-  channelAvatar: '/src/assets/images/streamer_avatar_creator_1791998920448.jpg',
-  channelBanner: '/src/assets/images/channel_stream_banner_1791998919824.jpg',
-  streamTitle: '🔥 [DIRECTO DUAL] VALORANT ROAD TO RADIANT | DROPS ACTIVOS KICK & TWITCH',
-  gameCategory: 'Valorant',
-  tags: ['espanol', 'drops', 'valorant', 'kick', 'tryhard'],
-  viewers: 940,
-  followers: 18450,
-  streamKey: 'live_k_sec_993421',
+  enabled: false,
+  channelName: '',
+  channelAvatar: '',
+  channelBanner: '',
+  streamTitle: '',
+  gameCategory: '',
+  tags: [],
+  viewers: 0,
+  followers: 0,
+  streamKey: '',
   delaySeconds: 0,
-  isLive: true,
+  isLive: false,
   chatSlowMode: false,
   chatSubOnly: false,
   chatFollowersOnly: false
 };
 
 const INITIAL_TWITCH_CONFIG: PlatformConfig = {
-  enabled: true,
-  channelName: 'streamer_pro',
-  channelAvatar: '/src/assets/images/streamer_avatar_creator_1791998920448.jpg',
-  channelBanner: '/src/assets/images/channel_stream_banner_1791998919824.jpg',
-  streamTitle: '🔥 [DIRECTO DUAL] VALORANT ROAD TO RADIANT | DROPS ACTIVOS KICK & TWITCH',
-  gameCategory: 'Valorant',
-  tags: ['espanol', 'drops', 'valorant', 'twitch', 'tryhard'],
-  viewers: 1420,
-  followers: 42100,
-  streamKey: 'live_tw_sec_882910',
+  enabled: false,
+  channelName: '',
+  channelAvatar: '',
+  channelBanner: '',
+  streamTitle: '',
+  gameCategory: '',
+  tags: [],
+  viewers: 0,
+  followers: 0,
+  streamKey: '',
   delaySeconds: 0,
-  isLive: true,
+  isLive: false,
   chatSlowMode: false,
   chatSubOnly: false,
   chatFollowersOnly: false
 };
 
-const INITIAL_CHAT_MESSAGES: UnifiedChatMessage[] = [
-  {
-    id: 'm1',
-    platform: 'twitch',
-    username: 'MartinGamer',
-    userColor: '#a855f7',
-    badges: [{ type: 'sub', label: 'SUB 6M' }],
-    text: '¡Buenas tardes gente! ¿Hoy se sube a Radiant o qué? 🔥',
-    timestamp: '19:42'
-  },
-  {
-    id: 'm2',
-    platform: 'kick',
-    username: 'NicoKick',
-    userColor: '#53fc18',
-    badges: [{ type: 'vip', label: 'VIP' }],
-    text: 'La calidad del stream dual se ve perfecta 1080p 60fps hermano',
-    timestamp: '19:42'
-  },
-  {
-    id: 'm3',
-    platform: 'twitch',
-    username: 'Valen_FPS',
-    userColor: '#38bdf8',
-    badges: [{ type: 'mod', label: 'MOD' }],
-    text: 'Recuerden respetar las normas del chat y disfrutar el directo!',
-    timestamp: '19:43'
-  },
-  {
-    id: 'm4',
-    platform: 'kick',
-    username: 'Sofi_Stream',
-    userColor: '#f472b6',
-    badges: [{ type: 'founder', label: 'FUNDADOR' }],
-    text: 'Esa miniatura nueva te quedó tremenda! Se nota el salto de calidad',
-    timestamp: '19:43'
-  },
-  {
-    id: 'm5',
-    platform: 'kick',
-    username: 'Lucas_Tryhard',
-    userColor: '#facc15',
-    badges: [{ type: 'sub', label: 'SUB 1M' }],
-    text: 'A meterle con todo a esa 1v4!! GG',
-    timestamp: '19:44'
-  }
-];
+const INITIAL_CHAT_MESSAGES: UnifiedChatMessage[] = [];
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<'obs' | 'highlights' | 'cam' | 'anchor' | 'stream' | 'thumbnails' | 'channel' | 'macros'>('obs');
@@ -114,33 +68,8 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // Live chat message stream for Kick and Twitch
-  useEffect(() => {
-    const sampleChats = [
-      { platform: 'twitch' as const, user: 'Gamer_Arg', color: '#c084fc', text: '¡Vamooo esa jugada tremenda!' },
-      { platform: 'kick' as const, user: 'Mati_Clutch', color: '#53fc18', text: '¡¡CLIP THAT!! qué locura de tiro' },
-      { platform: 'twitch' as const, user: 'Clara_GG', color: '#60a5fa', text: 'El audio y la música están súper bien balanceados' },
-      { platform: 'kick' as const, user: 'StreamFan99', color: '#4ade80', text: 'Seguido en Kick y Twitch, aguante el canal!' },
-    ];
-
-    const interval = setInterval(() => {
-      if (obsState.streaming) {
-        const randomItem = sampleChats[Math.floor(Math.random() * sampleChats.length)];
-        const newMsg: UnifiedChatMessage = {
-          id: `msg_${Date.now()}_${Math.random()}`,
-          platform: randomItem.platform,
-          username: randomItem.user,
-          userColor: randomItem.color,
-          badges: [{ type: 'sub', label: 'SUB' }],
-          text: randomItem.text,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        };
-        setChatMessages(prev => [...prev.slice(-30), newMsg]);
-      }
-    }, 6000);
-
-    return () => clearInterval(interval);
-  }, [obsState.streaming]);
+  // Sin chat simulado: los mensajes llegan solo de Kick/Twitch reales o del propio streamer.
+  // (Se eliminó el generador automático de mensajes falsos cada 6s).
 
   // Dual Broadcast Toggle
   const handleToggleGlobalStream = () => {
@@ -399,10 +328,10 @@ export default function App() {
 
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => obsController.restoreNominalNetwork()}
+                  onClick={() => setCurrentAlert(null)}
                   className="px-2.5 py-1 rounded bg-black/40 hover:bg-black/60 text-white font-semibold text-[11px] transition-colors border border-current"
                 >
-                  Restaurar Red Nominal
+                  Marcar como revisado
                 </button>
                 <button
                   onClick={() => setActiveTab('obs')}
@@ -435,12 +364,12 @@ export default function App() {
                 <span className="text-emerald-400 font-semibold">Kick Streaming Suite</span>
               </div>
               <div className="flex items-center gap-3 text-neutral-400 font-mono text-[11px]">
-                <span className="flex items-center gap-1.5 text-emerald-400 font-bold">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                  Red Óptima (0.0% Drops)
+                <span className="flex items-center gap-1.5 font-bold" style={{ color: obsState.connected ? '#34d399' : '#9ca3af' }}>
+                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: obsState.connected ? '#10b981' : '#6b7280' }} />
+                  {obsState.connected ? `OBS conectado (${obsState.stats.frameDropPercent.toFixed(2)}% drops)` : 'OBS no conectado'}
                 </span>
                 <span>·</span>
-                <span>1080p60 · NVENC H.264 · 6500 Kbps</span>
+                <span>{obsState.connected ? `${obsState.stats.bitrate} kb/s · ${obsState.stats.fps.toFixed(0)} FPS` : 'Sin telemetría: conecta OBS real'}</span>
               </div>
             </>
           )}

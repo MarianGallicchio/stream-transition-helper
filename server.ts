@@ -3,9 +3,14 @@ import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI, Type } from '@google/genai';
 import dotenv from 'dotenv';
 import path from 'path';
+import os from 'os';
+import { fileURLToPath } from 'url';
 import WebSocket from 'ws';
 
 dotenv.config();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
@@ -431,41 +436,80 @@ Devuelve un JSON estrictamente estructurado con estos campos.`;
   }
 });
 
-// 5. OBS WebSocket Backend Relay & Direct Device Probe
+// 5. OBS WebSocket Backend Relay & Direct Device Probe (sin simulados: reporta real)
 app.post('/api/obs/probe-connection', async (req: Request, res: Response) => {
-  const { host = 'localhost', port = 4455, password = '' } = req.body;
+  const { host = 'localhost', port = 4455 } = req.body;
+  let settled = false;
+  const done = (payload: object) => {
+    if (!settled) {
+      settled = true;
+      clearTimeout(timer);
+      try { ws.close(); } catch {}
+      return res.json(payload);
+    }
+  };
 
-  try {
-    const wsUrl = `ws://${host}:${port}`;
-    const ws = new WebSocket(wsUrl, { handshakeTimeout: 2000 });
-
-    ws.on('open', () => {
-      ws.close();
-      return res.json({
-        connected: true,
-        host,
-        port,
-        message: 'OBS Studio WebSocket v5 detectado y enlazado correctamente.'
-      });
-    });
-
-    ws.on('error', (err) => {
-      // Return accurate diagnosis without failing
-      return res.json({
-        connected: false,
-        host,
-        port,
-        error: err.message,
-        tip: 'Verifica que OBS Studio esté abierto y que "Habilitar servidor WebSocket" esté activado en Herramientas > Configuración del servidor WebSocket.'
-      });
-    });
-  } catch (err: any) {
-    return res.json({
+  const ws = new WebSocket(`ws://${host}:${port}`, { handshakeTimeout: 2500 } as any);
+  const timer = setTimeout(() => {
+    done({
       connected: false,
       host,
       port,
-      error: err.message
+      error: 'timeout: no hay respuesta en ws://' + host + ':' + port,
+      tip: 'Verifica que OBS Studio esté abierto y que "Habilitar servidor WebSocket" esté activado en Herramientas > Configuración del servidor WebSocket. Si OBS está abierto pero el puerto está cerrado, el servidor WS está apagado.'
     });
+  }, 3000);
+
+  ws.on('open', () => {
+    done({
+      connected: true,
+      host,
+      port,
+      message: 'OBS Studio WebSocket v5 detectado y enlazado correctamente.'
+    });
+  });
+
+  ws.on('error', (err: Error) => {
+    done({
+      connected: false,
+      host,
+      port,
+      error: err.message,
+      tip: 'Verifica que OBS Studio esté abierto y que "Habilitar servidor WebSocket" esté activado en Herramientas > Configuración del servidor WebSocket.'
+    });
+  });
+});
+
+// 6. Real PC info (sin simulados): CPU, RAM, SO, red. La GPU/cámaras/mics se detectan en el frontend con WebGL + enumerateDevices.
+app.get('/api/system/info', (_req: Request, res: Response) => {
+  try {
+    const cpus = os.cpus();
+    const nets = os.networkInterfaces();
+    const flatNets: Array<{ name: string; address: string; family: string }> = [];
+    for (const [name, addrs] of Object.entries(nets)) {
+      for (const a of addrs || []) {
+        if (!a.internal && a.family === 'IPv4') flatNets.push({ name, address: a.address, family: a.family });
+      }
+    }
+    return res.json({
+      hostname: os.hostname(),
+      platform: os.platform(),
+      arch: os.arch(),
+      release: os.release(),
+      cpuModel: cpus[0]?.model || 'desconocido',
+      cpuCores: cpus.length,
+      cpuSpeedMhz: cpus[0]?.speed || 0,
+      totalMemBytes: os.totalmem(),
+      freeMemBytes: os.freemem(),
+      uptimeSeconds: Math.floor(os.uptime()),
+      loadavg: os.loadavg(),
+      network: flatNets,
+      node: process.version,
+      geminiConfigured: Boolean(process.env.GEMINI_API_KEY),
+      timestamp: new Date().toISOString()
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: err?.message || 'no se pudo leer el sistema' });
   }
 });
 
@@ -481,7 +525,9 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     app.use(express.static(path.resolve(__dirname, 'dist')));
-    app.get('*', (_req, res) => {
+    // SPA fallback: solo para no-API (Express 4 compatible)
+    app.use((req, res, next) => {
+      if (req.path.startsWith('/api/')) return next();
       res.sendFile(path.resolve(__dirname, 'dist', 'index.html'));
     });
   }

@@ -12,13 +12,13 @@ interface ThumbnailStudioProps {
 }
 
 const PRESET_BACKGROUNDS = [
-  { id: 'bg_gaming', name: 'Esports Arena Neon', url: '/src/assets/images/thumbnail_gaming_action_1791998919003.jpg' },
-  { id: 'bg_studio', name: 'Estudio RGB Streamer', url: '/src/assets/images/thumbnail_irl_reaction_1791998919984.jpg' },
-  { id: 'bg_banner', name: 'Dark Speedlines', url: '/src/assets/images/channel_stream_banner_1791998919824.jpg' }
+  { id: 'bg_gaming', name: 'Esports Arena Neon', url: '/assets/images/thumbnail_gaming_action_1791998919003.jpg' },
+  { id: 'bg_studio', name: 'Estudio RGB Streamer', url: '/assets/images/thumbnail_irl_reaction_1791998919984.jpg' },
+  { id: 'bg_banner', name: 'Dark Speedlines', url: '/assets/images/channel_stream_banner_1791998919824.jpg' }
 ];
 
 const PRESET_STREAMERS = [
-  { id: 'streamer_headset', name: 'Streamer con Auriculares Pro', url: '/src/assets/images/streamer_avatar_creator_1791998920448.jpg' },
+  { id: 'streamer_headset', name: 'Streamer con Auriculares Pro', url: '/assets/images/streamer_avatar_creator_1791998920448.jpg' },
 ];
 
 export const ThumbnailStudio: React.FC<ThumbnailStudioProps> = ({
@@ -40,11 +40,11 @@ export const ThumbnailStudio: React.FC<ThumbnailStudioProps> = ({
     id: 'proj_default',
     title: 'Miniatura Principal',
     backgroundType: 'image',
-    backgroundImageUrl: '/src/assets/images/thumbnail_gaming_action_1791998919003.jpg',
+    backgroundImageUrl: '/assets/images/thumbnail_gaming_action_1791998919003.jpg',
     backgroundColor: '#0a0a0f',
     gradientFrom: '#581c87',
     gradientTo: '#064e3b',
-    streamerImage: '/src/assets/images/streamer_avatar_creator_1791998920448.jpg',
+    streamerImage: '/assets/images/streamer_avatar_creator_1791998920448.jpg',
     showStreamerCutout: true,
     streamerPosition: 'right',
     streamerGlow: true,

@@ -41,14 +41,12 @@ export const BroadcastManager: React.FC<BroadcastManagerProps> = ({
   isStreaming,
   onToggleGlobalStream
 }) => {
-  // Synchronized metadata form state
-  const [title, setTitle] = useState(twitchConfig.streamTitle || '🔥 DIRECTO DUAL TRYHARD | TOP 1 EN VIVO');
-  const [category, setCategory] = useState(twitchConfig.gameCategory || 'Valorant');
-  const [description, setDescription] = useState(
-    '¡Bienvenidos a la transmisión unificada en Kick y Twitch! Jugando partidas intensas con la comunidad. ¡Sigue el canal!'
-  );
+  // Sin metadatos falsos: empieza vacío hasta que escribas o generes con IA real.
+  const [title, setTitle] = useState(twitchConfig.streamTitle || '');
+  const [category, setCategory] = useState(twitchConfig.gameCategory || '');
+  const [description, setDescription] = useState('');
   const [tagInput, setTagInput] = useState('');
-  const [tags, setTags] = useState<string[]>(['espanol', 'drops', 'gaming', 'kick', 'twitch', 'tryhard']);
+  const [tags, setTags] = useState<string[]>([]);
 
   // Chat sender state
   const [chatInput, setChatInput] = useState('');

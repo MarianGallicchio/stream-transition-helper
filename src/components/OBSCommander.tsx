@@ -34,7 +34,9 @@ export const OBSCommander: React.FC<OBSCommanderProps> = ({
   const [passwordInput, setPasswordInput] = useState(obsState.password || '');
   const [isConnecting, setIsConnecting] = useState(false);
 
-  const activeScene = obsState.scenes.find(s => s.id === obsState.activeSceneId) || obsState.scenes[0];
+  const [connectError, setConnectError] = useState<string | null>(null);
+
+  const activeScene = obsState.scenes.find(s => s.id === obsState.activeSceneId) || obsState.scenes[0] || null;
 
   const handleSceneClick = (sceneId: string) => {
     obsController.switchScene(sceneId);
@@ -51,9 +53,23 @@ export const OBSCommander: React.FC<OBSCommanderProps> = ({
   const handleConnectSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsConnecting(true);
-    await obsController.connect(hostInput, parseInt(portInput, 10) || 4455, passwordInput);
-    setIsConnecting(false);
-    setShowConnectModal(false);
+    setConnectError(null);
+    try {
+      // 1) Prueba real vía backend (diagnóstico exacto de tu PC/OBS)
+      const probe = await fetch('/api/obs/probe-connection', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ host: hostInput, port: parseInt(portInput, 10) || 4455 })
+      }).then(r => r.json()).catch(() => null);
+      if (probe && probe.connected === false) {
+        setConnectError(`${probe.error || 'No conecta'}. ${probe.tip || ''}`);
+      }
+      const ok = await obsController.connect(hostInput, parseInt(portInput, 10) || 4455, passwordInput);
+      if (!ok && !connectError) setConnectError('OBS no responde en ese host:puerto. Abre OBS > Herramientas > Configuración del servidor WebSocket y actívalo (puerto 4455).');
+      else if (ok) setShowConnectModal(false);
+    } finally {
+      setIsConnecting(false);
+    }
   };
 
   // Format seconds to HH:MM:SS
@@ -67,13 +83,13 @@ export const OBSCommander: React.FC<OBSCommanderProps> = ({
   return (
     <div className="space-y-6">
       
-      {/* Top Banner: OBS Connection & Broadcast Quick Controls */}
+      {/* Top Banner: OBS Connection real (sin simulados) */}
       <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-4 flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
+            <span className={`w-2.5 h-2.5 rounded-full ${obsState.connected ? 'bg-emerald-400' : 'bg-neutral-500'}`} />
             <span className="text-sm font-semibold text-neutral-200">
-              OBS Studio WebSocket v5 Activo
+              {obsState.connected ? 'OBS Studio conectado (real)' : 'OBS no conectado'}
             </span>
             <span className="text-xs text-neutral-400 font-mono">
               ({obsState.host}:{obsState.port})
@@ -87,6 +103,15 @@ export const OBSCommander: React.FC<OBSCommanderProps> = ({
             <Server className="w-3.5 h-3.5" />
             <span>Configurar Conexión OBS</span>
           </button>
+          {obsState.scenes.length === 0 && (
+            <button
+              onClick={() => obsController.loadLocalTemplate()}
+              className="text-xs text-emerald-300 bg-emerald-950 hover:bg-emerald-900 border border-emerald-800 px-2.5 py-1 rounded transition-colors"
+              title="Carga plantillas editables locales (no es OBS real)"
+            >
+              Cargar plantilla local
+            </button>
+          )}
         </div>
 
         {/* Live Broadcast Telemetry Strip */}
@@ -101,7 +126,7 @@ export const OBSCommander: React.FC<OBSCommanderProps> = ({
           </div>
           <div className="flex items-center gap-1.5">
             <span className="text-neutral-400">DROPS:</span>
-            <span className="text-neutral-200 tabular-nums">0 (0.0%)</span>
+            <span className="text-neutral-200 tabular-nums">{obsState.stats.droppedFrames} ({obsState.stats.frameDropPercent.toFixed(2)}%)</span>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="text-neutral-400">CPU:</span>
@@ -127,27 +152,26 @@ export const OBSCommander: React.FC<OBSCommanderProps> = ({
                 <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
                 <span className="font-bold tracking-wider text-red-400 uppercase">OBS PROGRAM MONITOR</span>
                 <span className="text-neutral-400">·</span>
-                <span className="text-neutral-300 font-medium">{activeScene.name}</span>
+                <span className="text-neutral-300 font-medium">{activeScene?.name || 'Sin escena — conecta OBS o carga plantilla'}</span>
               </div>
               <span className="font-mono text-neutral-400">1920x1080 @ 60fps</span>
             </div>
 
-            {/* Simulated Live Broadcast Display */}
+            {/* Vista previa local (plantilla, no señal real de OBS) */}
             <div className="aspect-video w-full bg-black relative flex items-center justify-center overflow-hidden group select-none">
-              
+              {!activeScene && (
+                <div className="text-center p-8 text-neutral-400 text-sm">
+                  Sin escena activa. Conecta OBS real o carga plantilla local.
+                </div>
+              )}
               {/* Scene Visual Representation */}
               {obsState.activeSceneId === 'scene_starting' && (
                 <div className="w-full h-full bg-gradient-to-br from-indigo-950 via-neutral-950 to-purple-950 flex flex-col items-center justify-center p-8 text-center relative">
                   <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(147,51,234,0.15)_0,transparent_70%)]" />
-                  <span className="text-xs font-mono uppercase tracking-widest text-emerald-400 mb-2">Transmisión Iniciando</span>
+                  <span className="text-xs font-mono uppercase tracking-widest text-emerald-400 mb-2">Plantilla local</span>
                   <h2 className="text-3xl font-extrabold text-white tracking-tight mb-4 font-display">EMPEZAMOS EN BREVE</h2>
-                  <div className="text-5xl font-mono font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-purple-400 tabular-nums">
-                    03:45
-                  </div>
                   <div className="mt-6 flex items-center gap-4 text-xs font-mono text-neutral-300 bg-black/40 px-4 py-2 rounded-lg border border-neutral-800">
-                    <span>twitch.tv/mystream</span>
-                    <span>·</span>
-                    <span>kick.com/mystream</span>
+                    <span>Configura tu canal en “Anclaje OBS & Canales”</span>
                   </div>
                 </div>
               )}
@@ -155,7 +179,7 @@ export const OBSCommander: React.FC<OBSCommanderProps> = ({
               {obsState.activeSceneId === 'scene_chatting' && (
                 <div className="w-full h-full relative overflow-hidden bg-neutral-950">
                   <img
-                    src="/src/assets/images/thumbnail_irl_reaction_1791998919984.jpg"
+                    src="/assets/images/thumbnail_irl_reaction_1791998919984.jpg"
                     alt="Main Webcam Stream View"
                     referrerPolicy="no-referrer"
                     className="w-full h-full object-cover"
@@ -163,26 +187,25 @@ export const OBSCommander: React.FC<OBSCommanderProps> = ({
                   {/* Overlay elements */}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/30 pointer-events-none" />
                   
-                  {activeScene.sources.find(s => s.id === 'src_chatbox')?.visible && (
+                  {activeScene?.sources.find(s => s.id === 'src_chatbox')?.visible && (
                     <div className="absolute bottom-6 left-6 w-72 bg-neutral-950/80 backdrop-blur-md border border-neutral-800/80 rounded-lg p-3 text-xs space-y-2 pointer-events-none shadow-xl">
                       <div className="flex items-center gap-1.5 text-neutral-400 font-mono text-[10px] pb-1 border-b border-neutral-800">
                         <Tv className="w-3 h-3 text-purple-400" />
                         <span>Chat en Pantalla</span>
                       </div>
                       <div className="space-y-1">
-                        <div className="text-[11px]"><span className="text-emerald-400 font-bold">@Alex_Gaming:</span> que buen setup bro! 🔥</div>
-                        <div className="text-[11px]"><span className="text-purple-400 font-bold">@SofiStream:</span> vamos por ese top 1 hoy!!</div>
+                        <div className="text-[11px] text-neutral-500">Chat real: conecta Kick/Twitch. Sin mensajes simulados.</div>
                       </div>
                     </div>
                   )}
 
-                  {activeScene.sources.find(s => s.id === 'src_cam_frame')?.visible && (
+                  {activeScene?.sources.find(s => s.id === 'src_cam_frame')?.visible && (
                     <div className="absolute inset-4 border-2 border-purple-500/50 rounded-lg pointer-events-none shadow-[0_0_20px_rgba(168,85,247,0.3)]" />
                   )}
 
                   <div className="absolute top-4 right-4 bg-black/60 backdrop-blur-sm px-3 py-1.5 rounded-lg border border-neutral-800 flex items-center gap-2 text-xs">
                     <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                    <span className="font-medium text-white">Cámara Sony A6400 (4K)</span>
+                    <span className="font-medium text-white">Cámara (plantilla local)</span>
                   </div>
                 </div>
               )}
@@ -190,16 +213,16 @@ export const OBSCommander: React.FC<OBSCommanderProps> = ({
               {obsState.activeSceneId === 'scene_gameplay' && (
                 <div className="w-full h-full relative overflow-hidden bg-neutral-950">
                   <img
-                    src="/src/assets/images/thumbnail_gaming_action_1791998919003.jpg"
+                    src="/assets/images/thumbnail_gaming_action_1791998919003.jpg"
                     alt="Gameplay Capture View"
                     referrerPolicy="no-referrer"
                     className="w-full h-full object-cover"
                   />
                   {/* PiP Camera in Corner */}
-                  {activeScene.sources.find(s => s.id === 'src_cam_corner')?.visible && (
+                  {activeScene?.sources.find(s => s.id === 'src_cam_corner')?.visible && (
                     <div className="absolute bottom-4 right-4 w-52 aspect-video rounded-lg overflow-hidden border-2 border-emerald-400/80 shadow-2xl">
                       <img
-                        src="/src/assets/images/streamer_avatar_creator_1791998920448.jpg"
+                        src="/assets/images/streamer_avatar_creator_1791998920448.jpg"
                         alt="Facecam Streamer"
                         referrerPolicy="no-referrer"
                         className="w-full h-full object-cover"
@@ -349,7 +372,12 @@ export const OBSCommander: React.FC<OBSCommanderProps> = ({
               </div>
             </div>
 
-            {/* Scene Buttons Grid */}
+            {/* Scene Buttons Grid (solo reales o plantilla cargada) */}
+            {obsState.scenes.length === 0 ? (
+              <div className="bg-neutral-950 border border-dashed border-neutral-700 rounded-lg p-4 text-center text-xs text-neutral-400">
+                No hay escenas. Conecta OBS real o carga la plantilla local desde arriba.
+              </div>
+            ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {obsState.scenes.map((scene) => {
                 const isActive = scene.id === obsState.activeSceneId;
@@ -379,9 +407,11 @@ export const OBSCommander: React.FC<OBSCommanderProps> = ({
                 );
               })}
             </div>
+            )}
           </div>
 
           {/* Sources Visibility Inspector for Active Scene */}
+          {activeScene ? (
           <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-5 space-y-3">
             <div className="flex items-center justify-between">
               <div>
@@ -432,6 +462,11 @@ export const OBSCommander: React.FC<OBSCommanderProps> = ({
               ))}
             </div>
           </div>
+          ) : (
+            <div className="bg-neutral-900 border border-dashed border-neutral-700 rounded-xl p-6 text-center text-xs text-neutral-400">
+              Sin escenas. Conecta OBS real o pulsa “Cargar plantilla local”.
+            </div>
+          )}
 
         </div>
 
@@ -451,9 +486,14 @@ export const OBSCommander: React.FC<OBSCommanderProps> = ({
               </span>
             </div>
 
-            {/* Audio Channels List */}
+            {/* Audio Channels List (solo reales) */}
             <div className="space-y-4">
-              {obsState.audioChannels.map((channel) => (
+              {obsState.audioChannels.length === 0 ? (
+                <div className="bg-neutral-950 border border-dashed border-neutral-700 rounded-lg p-4 text-center text-xs text-neutral-400">
+                  Sin canales de audio. Conecta OBS real o detecta micrófonos en “Anclaje OBS & Canales”.
+                </div>
+              ) : (
+              obsState.audioChannels.map((channel) => (
                 <div key={channel.id} className="bg-neutral-950/70 border border-neutral-800/80 rounded-lg p-3.5 space-y-2.5">
                   <div className="flex items-center justify-between">
                     <div className="min-w-0 pr-2">
@@ -508,12 +548,13 @@ export const OBSCommander: React.FC<OBSCommanderProps> = ({
                     </div>
                   </div>
                 </div>
-              ))}
+              ))
+              )}
             </div>
 
             {/* Quick Mixer Reset */}
             <div className="pt-2 flex items-center justify-between text-xs text-neutral-400 border-t border-neutral-800/80">
-              <span>Limiter OBS Activo (-0.5 dB)</span>
+              <span>{obsState.connected ? 'Mezclador OBS real' : 'Sin mezclador: conecta OBS'}</span>
               <button
                 onClick={() => {
                   obsState.audioChannels.forEach(ch => {
@@ -563,8 +604,13 @@ export const OBSCommander: React.FC<OBSCommanderProps> = ({
             </div>
 
             <p className="text-xs text-neutral-400 leading-relaxed">
-              En OBS Studio ve a <strong className="text-neutral-200">Herramientas &gt; Configuración del servidor WebSocket</strong>. Habilita el servidor (puerto por defecto 4455). Si no está abierto, el software continuará en modo simulador interactivo para que pruebes todas las funciones.
+              En OBS Studio ve a <strong className="text-neutral-200">Herramientas &gt; Configuración del servidor WebSocket</strong>. Habilita el servidor (puerto por defecto 4455). Sin conexión real no hay telemetría ni control: no se usa simulador.
             </p>
+            {connectError && (
+              <div className="bg-red-950/60 border border-red-800 text-red-300 text-xs px-3 py-2 rounded-lg">
+                {connectError}
+              </div>
+            )}
 
             <form onSubmit={handleConnectSubmit} className="space-y-3">
               <div>

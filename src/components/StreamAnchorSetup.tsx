@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { PlatformConfig } from '../types/stream';
 import { obsController } from '../services/obsController';
+import { fetchRealSystemInfo, getRealHardwareInfo, getRealMediaDevices, formatBytes, RealSystemInfo, RealHardwareInfo } from '../services/systemInfo';
 
 interface StreamAnchorSetupProps {
   kickConfig: PlatformConfig;
@@ -35,37 +36,98 @@ export const StreamAnchorSetup: React.FC<StreamAnchorSetupProps> = ({
   onUpdateTwitch,
   isObsConnected
 }) => {
-  // OBS Configuration Anchor state
+  // OBS Configuration Anchor state (sin valores falsos)
   const [obsHost, setObsHost] = useState('localhost');
   const [obsPort, setObsPort] = useState('4455');
   const [obsPassword, setObsPassword] = useState('');
   const [isTestingObs, setIsTestingObs] = useState(false);
-  const [obsAnchorSuccess, setObsAnchorSuccess] = useState(true);
+  const [obsTestResult, setObsTestResult] = useState<string | null>(null);
 
-  // Twitch Stream Anchor state
+  // Twitch / Kick reales (vacío hasta que pegues tu clave real)
   const [twitchServer, setTwitchServer] = useState(TWITCH_INGEST_SERVERS[0].url);
-  const [twitchKey, setTwitchKey] = useState(twitchConfig.streamKey || 'live_749201847_xK89sL01mPq');
+  const [twitchKey, setTwitchKey] = useState(twitchConfig.streamKey || '');
   const [showTwitchKey, setShowTwitchKey] = useState(false);
-  const [twitchLatency, setTwitchLatency] = useState(14);
 
-  // Kick Stream Anchor state
   const [kickServer, setKickServer] = useState(KICK_INGEST_SERVERS[0].url);
-  const [kickKey, setKickKey] = useState(kickConfig.streamKey || 'sk_live_994812304_vN34kW89z');
+  const [kickKey, setKickKey] = useState(kickConfig.streamKey || '');
   const [showKickKey, setShowKickKey] = useState(false);
-  const [kickLatency, setKickLatency] = useState(19);
+
+  // PC real de este equipo
+  const [sysInfo, setSysInfo] = useState<RealSystemInfo | null>(null);
+  const [hwInfo, setHwInfo] = useState<RealHardwareInfo | null>(null);
+  const [media, setMedia] = useState<{ audioInputs: Array<{ label: string }>; videoInputs: Array<{ label: string }>; audioOutputs: Array<{ label: string }> }>({ audioInputs: [], videoInputs: [], audioOutputs: [] });
 
   // Notice & Feedback state
   const [copiedItem, setCopiedItem] = useState<string | null>(null);
   const [saveNotice, setSaveNotice] = useState<string | null>(null);
 
-  // Detect and verify connection
+  useEffect(() => {
+    fetchRealSystemInfo().then(setSysInfo);
+    try { setHwInfo(getRealHardwareInfo()); } catch {}
+    getRealMediaDevices().then(setMedia);
+    try {
+      const saved = localStorage.getItem('streamhub_obs_anchor');
+      if (saved) {
+        const p = JSON.parse(saved);
+        if (p.obsHost) setObsHost(p.obsHost);
+        if (p.obsPort) setObsPort(String(p.obsPort));
+      }
+    } catch {}
+  }, []);
+
+  // Detecta dispositivos reales y crea canales de audio reales en el mezclador
+  const handleDetectRealDevices = async () => {
+    try {
+      // Pide permiso para ver etiquetas reales
+      try { await navigator.mediaDevices.getUserMedia({ audio: true }); } catch {}
+      const real = await getRealMediaDevices();
+      setMedia(real);
+      const channels = real.audioInputs.map((d, i) => ({
+        id: `real_mic_${i}`,
+        name: d.label || `Micrófono real ${i + 1}`,
+        type: 'mic' as const,
+        volume: 0.8,
+        volumeDb: -3.9,
+        muted: false,
+        peak: 0
+      }));
+      if (channels.length > 0) {
+        obsController.setRealAudioChannels(channels);
+        setSaveNotice(`Detectados ${channels.length} micrófono(s) reales en tu PC.`);
+      } else {
+        setSaveNotice('No se detectaron micrófonos. Conecta uno y permite acceso en el navegador.');
+      }
+      setTimeout(() => setSaveNotice(null), 3500);
+    } catch {
+      setSaveNotice('No se pudo enumerar dispositivos.');
+      setTimeout(() => setSaveNotice(null), 3000);
+    }
+  };
+
+  // Detect and verify connection (real, sin marcar éxito falso)
   const handleTestAndAnchorObs = async () => {
     setIsTestingObs(true);
-    const success = await obsController.connect(obsHost, parseInt(obsPort, 10) || 4455, obsPassword);
-    setIsTestingObs(false);
-    setObsAnchorSuccess(true);
-    setSaveNotice('¡OBS Studio anclado y verificado en puerto ' + obsPort + '!');
-    setTimeout(() => setSaveNotice(null), 3000);
+    setObsTestResult(null);
+    try {
+      const probe = await fetch('/api/obs/probe-connection', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ host: obsHost, port: parseInt(obsPort, 10) || 4455 })
+      }).then(r => r.json());
+      const success = await obsController.connect(obsHost, parseInt(obsPort, 10) || 4455, obsPassword);
+      if (success && probe?.connected) {
+        setObsTestResult('Conectado a OBS real.');
+        setSaveNotice('¡OBS real anclado en ' + obsHost + ':' + obsPort + '!');
+      } else {
+        setObsTestResult(`No conecta: ${probe?.error || 'sin respuesta'}. ${probe?.tip || 'Activa WebSocket en OBS > Herramientas.'}`);
+        setSaveNotice(null);
+      }
+    } catch (e: any) {
+      setObsTestResult('Error probando OBS: ' + (e?.message || e));
+    } finally {
+      setIsTestingObs(false);
+      setTimeout(() => setSaveNotice(null), 3000);
+    }
   };
 
   const handleSaveAllAnchors = () => {
@@ -181,28 +243,28 @@ export const StreamAnchorSetup: React.FC<StreamAnchorSetupProps> = ({
             </span>
           </div>
 
-          {/* Connection Status Card */}
+          {/* Connection Status Card (real) */}
           <div className="p-4 bg-neutral-950 border border-neutral-800 rounded-xl space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
-                <span className="text-xs font-bold text-neutral-200">OBS Studio Enlazado</span>
+                <span className={`w-2.5 h-2.5 rounded-full ${isObsConnected ? 'bg-emerald-400' : 'bg-neutral-500'}`} />
+                <span className="text-xs font-bold text-neutral-200">{isObsConnected ? 'OBS conectado (real)' : 'OBS no conectado'}</span>
               </div>
-              <span className="text-[11px] font-mono text-emerald-400 font-bold">0.4ms Latencia</span>
+              <span className="text-[11px] font-mono text-neutral-400 font-bold">{obsHost}:{obsPort}</span>
             </div>
 
             <div className="text-xs text-neutral-400 leading-relaxed">
-              El puerto WebSocket v5 está activo y sincronizado. Los comandos de cambio de escena, vúmetros y transiciones se comunican directamente sin intermediarios.
+              {obsTestResult || 'Probá la conexión real. Sin WebSocket activo en OBS no hay control ni telemetría.'}
             </div>
 
             <div className="grid grid-cols-2 gap-2 pt-1 text-[11px] font-mono">
               <div className="bg-neutral-900 p-2 rounded border border-neutral-800/80">
-                <span className="text-neutral-500 block">Motor OBS</span>
-                <span className="text-neutral-200 font-semibold">OBS 30.2+ (64-bit)</span>
+                <span className="text-neutral-500 block">Tu PC (backend real)</span>
+                <span className="text-neutral-200 font-semibold">{sysInfo ? `${sysInfo.cpuModel} · ${sysInfo.cpuCores} núcleos` : 'Leyendo...'}</span>
               </div>
               <div className="bg-neutral-900 p-2 rounded border border-neutral-800/80">
-                <span className="text-neutral-500 block">Codificador Hardware</span>
-                <span className="text-purple-400 font-semibold">NVIDIA NVENC H.264</span>
+                <span className="text-neutral-500 block">RAM / GPU (navegador)</span>
+                <span className="text-purple-400 font-semibold">{sysInfo ? `${formatBytes(sysInfo.totalMemBytes)} RAM` : '...'} · {hwInfo ? hwInfo.gpu.slice(0, 42) : 'GPU leyendo...'}</span>
               </div>
             </div>
           </div>
@@ -252,24 +314,46 @@ export const StreamAnchorSetup: React.FC<StreamAnchorSetupProps> = ({
             </button>
           </div>
 
-          {/* Hardware Device Detection */}
+          {/* Real Device Detection */}
           <div className="pt-2 border-t border-neutral-800/80 space-y-2">
-            <span className="text-xs font-bold text-neutral-300 block">Dispositivos de Entrada Detectados:</span>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-neutral-300 block">Tu PC en este momento (real):</span>
+              <button onClick={handleDetectRealDevices} className="text-[11px] px-2 py-1 rounded bg-neutral-800 hover:bg-neutral-700 text-emerald-300 border border-emerald-900/50">
+                Detectar micrófonos/cámaras
+              </button>
+            </div>
             <div className="space-y-1.5 text-xs">
-              <div className="flex items-center justify-between p-2 rounded bg-neutral-950 border border-neutral-800">
-                <span className="flex items-center gap-2 text-neutral-300">
-                  <Mic className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Micrófono Shure SM7B (USB Audio)</span>
-                </span>
-                <span className="text-[10px] font-mono text-emerald-400 font-bold">24-bit 48kHz</span>
-              </div>
-              <div className="flex items-center justify-between p-2 rounded bg-neutral-950 border border-neutral-800">
-                <span className="flex items-center gap-2 text-neutral-300">
-                  <Cpu className="w-3.5 h-3.5 text-purple-400" />
-                  <span>Cámara Sony A6400 (Elgato Cam Link 4K)</span>
-                </span>
-                <span className="text-[10px] font-mono text-purple-400 font-bold">1080p60</span>
-              </div>
+              {media.audioInputs.length === 0 && media.videoInputs.length === 0 ? (
+                <div className="p-2 rounded bg-neutral-950 border border-dashed border-neutral-700 text-neutral-400">
+                  Sin dispositivos listados. Pulsa detectar y permite acceso al micrófono/cámara en el navegador.
+                </div>
+              ) : (
+                <>
+                  {media.audioInputs.map((d, i) => (
+                    <div key={'a'+i} className="flex items-center justify-between p-2 rounded bg-neutral-950 border border-neutral-800">
+                      <span className="flex items-center gap-2 text-neutral-300">
+                        <Mic className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>{d.label}</span>
+                      </span>
+                      <span className="text-[10px] font-mono text-emerald-400 font-bold">audioinput</span>
+                    </div>
+                  ))}
+                  {media.videoInputs.map((d, i) => (
+                    <div key={'v'+i} className="flex items-center justify-between p-2 rounded bg-neutral-950 border border-neutral-800">
+                      <span className="flex items-center gap-2 text-neutral-300">
+                        <Cpu className="w-3.5 h-3.5 text-purple-400" />
+                        <span>{d.label}</span>
+                      </span>
+                      <span className="text-[10px] font-mono text-purple-400 font-bold">videoinput</span>
+                    </div>
+                  ))}
+                </>
+              )}
+              {sysInfo && (
+                <div className="p-2 rounded bg-neutral-950 border border-neutral-800 text-[11px] font-mono text-neutral-400">
+                  {sysInfo.hostname} · {sysInfo.platform}/{sysInfo.arch} · RAM libre {formatBytes(sysInfo.freeMemBytes)} de {formatBytes(sysInfo.totalMemBytes)} · Red: {sysInfo.network.map(n => n.address).join(', ') || 'sin IPv4 pública'}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -287,9 +371,8 @@ export const StreamAnchorSetup: React.FC<StreamAnchorSetupProps> = ({
                 <h3 className="font-bold text-white text-sm">Anclaje de Transmisión: Twitch</h3>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-xs font-mono text-purple-400 font-bold">Ping: {twitchLatency}ms</span>
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-purple-950 text-purple-300 border border-purple-800">
-                  RTMP LISTO
+                  {twitchKey ? 'CLAVE CARGADA' : 'SIN CLAVE'}
                 </span>
               </div>
             </div>
@@ -301,14 +384,12 @@ export const StreamAnchorSetup: React.FC<StreamAnchorSetupProps> = ({
                   value={twitchServer}
                   onChange={(e) => {
                     setTwitchServer(e.target.value);
-                    const selected = TWITCH_INGEST_SERVERS.find(s => s.url === e.target.value);
-                    if (selected) setTwitchLatency(selected.ping);
                   }}
                   className="w-full bg-neutral-950 border border-neutral-700 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-purple-400"
                 >
                   {TWITCH_INGEST_SERVERS.map(srv => (
                     <option key={srv.url} value={srv.url}>
-                      {srv.name} — {srv.url} ({srv.ping}ms)
+                      {srv.name} — {srv.url}
                     </option>
                   ))}
                 </select>
@@ -370,9 +451,8 @@ export const StreamAnchorSetup: React.FC<StreamAnchorSetupProps> = ({
                 <h3 className="font-bold text-white text-sm">Anclaje de Transmisión: Kick</h3>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-xs font-mono text-emerald-400 font-bold">Ping: {kickLatency}ms</span>
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800">
-                  RTMP LISTO
+                  {kickKey ? 'CLAVE CARGADA' : 'SIN CLAVE'}
                 </span>
               </div>
             </div>
@@ -384,14 +464,12 @@ export const StreamAnchorSetup: React.FC<StreamAnchorSetupProps> = ({
                   value={kickServer}
                   onChange={(e) => {
                     setKickServer(e.target.value);
-                    const selected = KICK_INGEST_SERVERS.find(s => s.url === e.target.value);
-                    if (selected) setKickLatency(selected.ping);
                   }}
                   className="w-full bg-neutral-950 border border-neutral-700 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-emerald-400"
                 >
                   {KICK_INGEST_SERVERS.map(srv => (
                     <option key={srv.url} value={srv.url}>
-                      {srv.name} — {srv.url} ({srv.ping}ms)
+                      {srv.name} — {srv.url}
                     </option>
                   ))}
                 </select>

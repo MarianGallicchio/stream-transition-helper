@@ -3,9 +3,8 @@ import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
   CartesianGrid, ReferenceLine, Legend, BarChart, Bar
 } from 'recharts';
-import { Activity, Cpu, Wifi, AlertTriangle, TrendingUp, RefreshCw, Zap } from 'lucide-react';
+import { Activity, Cpu, Wifi, AlertTriangle, TrendingUp, Zap } from 'lucide-react';
 import { OBSStats } from '../types/stream';
-import { obsController } from '../services/obsController';
 
 interface StreamTelemetryChartsProps {
   currentStats: OBSStats;
@@ -22,41 +21,9 @@ interface TelemetryPoint {
   networkJitter: number;
 }
 
-// Generate realistic initial 60-minute historical telemetry data
+// Sin historial simulado: empieza vacío y solo guarda puntos reales.
 const generateInitialTelemetry = (): TelemetryPoint[] => {
-  const points: TelemetryPoint[] = [];
-  const now = Date.now();
-  
-  for (let i = 60; i >= 0; i--) {
-    const timeObj = new Date(now - i * 60 * 1000);
-    const timeLabel = timeObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    
-    // Realistic fluctuations: Bitrate centered around 6,800 kbps
-    const baseBitrate = 6750;
-    const wave = Math.sin(i / 5) * 180;
-    const noise = (Math.random() - 0.5) * 120;
-    const bitrate = Math.round(baseBitrate + wave + noise);
-
-    // CPU centered around 4.5% with minor peaks during scene transitions
-    const cpuPeak = (i % 12 === 0) ? 2.5 : 0;
-    const cpu = parseFloat((4.2 + Math.sin(i / 3) * 0.8 + cpuPeak + Math.random() * 0.4).toFixed(1));
-
-    // Frame drops mostly 0, with rare 1-2 frames
-    const frameDrops = (i === 24 || i === 47) ? 2 : 0;
-    const fps = parseFloat((59.8 + Math.random() * 0.3).toFixed(1));
-
-    points.push({
-      time: timeLabel,
-      timestamp: timeObj.getTime(),
-      bitrate,
-      cpu,
-      fps,
-      frameDrops,
-      networkJitter: parseFloat((4 + Math.random() * 2).toFixed(1))
-    });
-  }
-
-  return points;
+  return [];
 };
 
 export const StreamTelemetryCharts: React.FC<StreamTelemetryChartsProps> = ({ currentStats, isStreaming }) => {
@@ -64,30 +31,28 @@ export const StreamTelemetryCharts: React.FC<StreamTelemetryChartsProps> = ({ cu
   const [timeRange, setTimeRange] = useState<'15m' | '30m' | '60m'>('60m');
   const [chartMode, setChartMode] = useState<'overview' | 'bitrate' | 'cpu' | 'drops'>('overview');
 
-  // Real-time ticking updates: push new data point every 15 seconds
+  // Solo puntos reales: si no hay streaming ni OBS conectado, no se inventan datos.
   useEffect(() => {
+    if (!isStreaming) return;
     const interval = setInterval(() => {
       const now = new Date();
       const timeLabel = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      
+
       const newPoint: TelemetryPoint = {
         time: timeLabel,
         timestamp: now.getTime(),
-        bitrate: isStreaming ? currentStats.bitrate : 0,
-        cpu: parseFloat((currentStats.cpu + (Math.random() - 0.5) * 0.4).toFixed(1)),
-        fps: parseFloat((currentStats.fps).toFixed(1)),
-        frameDrops: Math.random() > 0.95 ? 1 : 0,
-        networkJitter: parseFloat((4.2 + (Math.random() - 0.5)).toFixed(1))
+        bitrate: currentStats.bitrate,
+        cpu: currentStats.cpu,
+        fps: currentStats.fps,
+        frameDrops: currentStats.droppedFrames,
+        networkJitter: 0
       };
 
-      setData(prev => {
-        const updated = [...prev.slice(1), newPoint];
-        return updated;
-      });
+      setData(prev => [...prev, newPoint].slice(-61));
     }, 15000);
 
     return () => clearInterval(interval);
-  }, [currentStats, isStreaming]);
+  }, [currentStats.bitrate, currentStats.cpu, currentStats.fps, currentStats.droppedFrames, isStreaming]);
 
   // Filter data based on selected range
   const filteredData = useMemo(() => {
@@ -211,36 +176,15 @@ export const StreamTelemetryCharts: React.FC<StreamTelemetryChartsProps> = ({ cu
         </div>
       </div>
 
-      {/* Production Telemetry Calibration & Diagnostic Tools */}
+      {/* Diagnóstico real (sin botones de simulación) */}
       <div className="bg-neutral-950/70 border border-neutral-800/90 rounded-lg p-3 flex flex-wrap items-center justify-between gap-3 text-xs">
         <div className="flex items-center gap-2">
           <Zap className="w-3.5 h-3.5 text-emerald-400" />
-          <span className="font-semibold text-neutral-300">Diagnóstico & Calibración de Ancho de Banda:</span>
-          <span className="text-neutral-500 hidden sm:inline text-[11px]">(Monitoreo estricto: Alerta si Frames Drop &gt; 5.0% o Bitrate &lt; 4500 kb/s)</span>
+          <span className="font-semibold text-neutral-300">Telemetría real de OBS:</span>
+          <span className="text-neutral-500 hidden sm:inline text-[11px]">{isStreaming ? 'Registrando puntos reales cada 15s.' : 'Inicia streaming con OBS conectado para registrar.'}</span>
         </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => obsController.simulateHighFrameDrops(6.4)}
-            className="px-2.5 py-1 rounded bg-neutral-900 hover:bg-neutral-800 text-neutral-300 border border-neutral-700 font-semibold text-[11px] transition-colors"
-            title="Prueba de umbral crítico de pérdida de paquetes"
-          >
-            Comprobar Alerta Drops (&gt;5%)
-          </button>
-          <button
-            onClick={() => obsController.simulateBitrateDrop(2850)}
-            className="px-2.5 py-1 rounded bg-neutral-900 hover:bg-neutral-800 text-neutral-300 border border-neutral-700 font-semibold text-[11px] transition-colors"
-            title="Prueba de fluctuación de ancho de banda"
-          >
-            Comprobar Caída Bitrate
-          </button>
-          <button
-            onClick={() => obsController.restoreNominalNetwork()}
-            className="px-2.5 py-1 rounded bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-300 border border-emerald-800/60 font-semibold text-[11px] transition-colors"
-            title="Restaura la emisión a estado óptimo nominal"
-          >
-            Recalibrar a Nominal
-          </button>
+        <div className="text-[11px] font-mono text-neutral-500">
+          {filteredData.length} puntos reales
         </div>
       </div>
 
@@ -268,7 +212,7 @@ export const StreamTelemetryCharts: React.FC<StreamTelemetryChartsProps> = ({ cu
               <Cpu className="w-3.5 h-3.5 text-purple-400" />
               <span>Carga de CPU (Codificador)</span>
             </span>
-            <span className="text-[10px] font-mono text-purple-400">NVENC</span>
+            <span className="text-[10px] font-mono text-purple-400">{isStreaming ? 'EN VIVO' : 'DETENIDO'}</span>
           </div>
           <div className="text-lg font-black font-mono text-purple-400 tabular-nums">
             {statsSummary.avgCpu}% <span className="text-xs font-normal text-neutral-400">avg</span>
@@ -284,13 +228,13 @@ export const StreamTelemetryCharts: React.FC<StreamTelemetryChartsProps> = ({ cu
               <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
               <span>Pérdida de Cuadros</span>
             </span>
-            <span className="text-[10px] font-mono text-emerald-400">0.00%</span>
+            <span className="text-[10px] font-mono text-emerald-400">{currentStats.frameDropPercent.toFixed(2)}%</span>
           </div>
           <div className="text-lg font-black font-mono text-neutral-100 tabular-nums">
             {statsSummary.totalDrops} <span className="text-xs font-normal text-neutral-400">frames</span>
           </div>
           <div className="text-[10px] text-neutral-500 font-mono">
-            142,000 cuadros procesados
+            {currentStats.totalFrames.toLocaleString()} cuadros procesados
           </div>
         </div>
 
@@ -300,13 +244,13 @@ export const StreamTelemetryCharts: React.FC<StreamTelemetryChartsProps> = ({ cu
               <TrendingUp className="w-3.5 h-3.5 text-blue-400" />
               <span>Calidad de Red</span>
             </span>
-            <span className="text-[10px] font-mono text-blue-400">100%</span>
+            <span className="text-[10px] font-mono text-blue-400">{isStreaming ? 'MIDIENDO' : 'SIN SEÑAL'}</span>
           </div>
           <div className="text-lg font-black font-mono text-blue-400 tabular-nums">
-            60.0 <span className="text-xs font-normal text-neutral-400">FPS Constante</span>
+            {currentStats.fps.toFixed(1)} <span className="text-xs font-normal text-neutral-400">FPS</span>
           </div>
           <div className="text-[10px] text-neutral-500 font-mono">
-            Jitter: 4.2ms · Buffer: Óptimo
+            Bitrate actual: {currentStats.bitrate} kb/s
           </div>
         </div>
       </div>

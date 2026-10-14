@@ -13,13 +13,13 @@ interface ChannelAssetsManagerProps {
 }
 
 const PRESET_AVATARS = [
-  { id: 'av_cyber', name: 'Streamer Pro Gamer', url: '/src/assets/images/streamer_avatar_creator_1791998920448.jpg' },
-  { id: 'av_irl', name: 'Studio Headset Portrait', url: '/src/assets/images/thumbnail_irl_reaction_1791998919984.jpg' }
+  { id: 'av_cyber', name: 'Streamer Pro Gamer', url: '/assets/images/streamer_avatar_creator_1791998920448.jpg' },
+  { id: 'av_irl', name: 'Studio Headset Portrait', url: '/assets/images/thumbnail_irl_reaction_1791998919984.jpg' }
 ];
 
 const PRESET_BANNERS = [
-  { id: 'bn_official', name: 'Kick & Twitch Speedlines', url: '/src/assets/images/channel_stream_banner_1791998919824.jpg' },
-  { id: 'bn_arena', name: 'Esports Championship Stadium', url: '/src/assets/images/thumbnail_gaming_action_1791998919003.jpg' }
+  { id: 'bn_official', name: 'Kick & Twitch Speedlines', url: '/assets/images/channel_stream_banner_1791998919824.jpg' },
+  { id: 'bn_arena', name: 'Esports Championship Stadium', url: '/assets/images/thumbnail_gaming_action_1791998919003.jpg' }
 ];
 
 export const ChannelAssetsManager: React.FC<ChannelAssetsManagerProps> = ({
@@ -28,8 +28,8 @@ export const ChannelAssetsManager: React.FC<ChannelAssetsManagerProps> = ({
   onUpdateAvatar,
   onUpdateBanner,
 }) => {
-  const [selectedAvatar, setSelectedAvatar] = useState(kickConfig.channelAvatar || '/src/assets/images/streamer_avatar_creator_1791998920448.jpg');
-  const [selectedBanner, setSelectedBanner] = useState(kickConfig.channelBanner || '/src/assets/images/channel_stream_banner_1791998919824.jpg');
+  const [selectedAvatar, setSelectedAvatar] = useState(kickConfig.channelAvatar || '/assets/images/streamer_avatar_creator_1791998920448.jpg');
+  const [selectedBanner, setSelectedBanner] = useState(kickConfig.channelBanner || '/assets/images/channel_stream_banner_1791998919824.jpg');
   const [avatarPrompt, setAvatarPrompt] = useState('Avatar ilustrado streamer futurista con luces neon y auriculares');
   const [isGeneratingAiAvatar, setIsGeneratingAiAvatar] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
