@@ -1,0 +1,6 @@
+{
+  "name": "StreamHub Studio - Kick & Twitch OBS Commander",
+  "description": "Software integral para gestionar transmisiones simultáneas en Kick y Twitch, controlar OBS Studio con escenas y transiciones, editor y generador de miniaturas IA.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
